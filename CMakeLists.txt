@@ -107,22 +107,26 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 # --- 7. Resource Management & Binary Packing ---
+if(WIN32)
+    set(APPEND_CMD cmd /c "copy /b $<TARGET_FILE_BASE_NAME:${PROJECT_NAME}>_raw.exe + data.zip $<TARGET_FILE_NAME:${PROJECT_NAME}>")
+else()
+    set(APPEND_CMD sh -c "cat $<TARGET_FILE_BASE_NAME:${PROJECT_NAME}>_raw.exe data.zip > $<TARGET_FILE_NAME:${PROJECT_NAME}> && chmod +x $<TARGET_FILE_NAME:${PROJECT_NAME}>")
+endif()
+
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    # 1. Sync assets folder (CMake handles slashes fine here)
+    # Sync assets folder
     COMMAND ${CMAKE_COMMAND} -E copy_directory 
             "${CMAKE_CURRENT_SOURCE_DIR}/assets" 
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
     
-    # 2. Zip the assets
+    # Zip the assets
     COMMAND ${CMAKE_COMMAND} -E tar cf data.zip --format=zip "assets"
     
-    # 3. Create the 'raw' backup using CMake's internal copy (handles slashes)
+    # Create the 'raw' backup
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:${PROJECT_NAME}>" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/$<TARGET_FILE_BASE_NAME:${PROJECT_NAME}>_raw.exe"
 
-    # 4. The Binary Append - THE FIX IS HERE
-    # We use 'file(TO_NATIVE_PATH ...)' is for configuration time, 
-    # but for a custom command, we wrap the logic in a small batch-script style call
-    COMMAND cmd /c "for %I in ("$<TARGET_FILE_DIR:${PROJECT_NAME}>") do copy /b "%~fI\$<TARGET_FILE_BASE_NAME:${PROJECT_NAME}>_raw.exe" + data.zip "%~fI\$<TARGET_FILE_NAME:${PROJECT_NAME}>""
+    # Execute the OS-specific append command
+    COMMAND ${APPEND_CMD}
     
     WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
     COMMENT "[POST_BUILD] Appending assets to binary..."
