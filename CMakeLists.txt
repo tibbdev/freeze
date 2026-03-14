@@ -1,21 +1,25 @@
 cmake_minimum_required(VERSION 3.14)
-# set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
 project(freeze LANGUAGES CXX C)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
 # --- 1. Global Build Settings (Forces everything to be Static) ---
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
+set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
 
 # SDL3 Settings
-#set(SDL_STATIC ON CACHE BOOL "" FORCE)
-#set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-#set(SDL_TEST OFF CACHE BOOL "" FORCE)
+set(SDL_STATIC ON CACHE BOOL "" FORCE)
+set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL_TEST OFF CACHE BOOL "" FORCE)
+
+set(SDL_AVX OFF CACHE BOOL "" FORCE)
+set(SDL_AVX2 OFF CACHE BOOL "" FORCE)
+set(SDL_AVX512F OFF CACHE BOOL "" FORCE)
 
 # SDL3_mixer Settings - Force Static and disable dependencies
 #set(SDL3MIXER_VENDORED ON CACHE BOOL "" FORCE)
@@ -26,9 +30,16 @@ option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 #set(SDL3MIXER_MOD OFF CACHE BOOL "" FORCE)
 
 # SDL_ttf Settings
-#set(SDL3TTF_VENDORED ON CACHE BOOL "" FORCE)
-#set(SDL3TTF_SAMPLES OFF CACHE BOOL "" FORCE)
-#set(SDL3TTF_HARFBUZZ OFF CACHE BOOL "" FORCE)
+set(SDL3TTF_VENDORED ON CACHE BOOL "" FORCE) # THIS is the critical toggle
+set(SDL3TTF_HARFBUZZ OFF CACHE BOOL "" FORCE)
+set(SDL3TTF_SAMPLES OFF CACHE BOOL "" FORCE)
+
+# Force FreeType to build as a static sub-project
+set(FT_WITH_ZLIB OFF CACHE BOOL "" FORCE)
+set(FT_WITH_BZIP2 OFF CACHE BOOL "" FORCE)
+set(FT_WITH_PNG OFF CACHE BOOL "" FORCE)
+set(FT_WITH_HARFBUZZ OFF CACHE BOOL "" FORCE)
+
 
 # PhysFS Settings
 set(PHYSFS_BUILD_TEST OFF CACHE BOOL "" FORCE)
@@ -36,6 +47,18 @@ set(PHYSFS_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(PHYSFS_BUILD_STATIC ON CACHE BOOL "" FORCE)
 
 # --- 2. Fetching ---
+# FetchContent_Declare(freetype
+#     GIT_REPOSITORY https://github.com/freetype/freetype.git
+#     GIT_TAG        VER-2-13-2
+# )
+# FetchContent_MakeAvailable(freetype)
+
+# # IMPORTANT: Point SDL_ttf to the FreeType we just built
+# # This prevents it from calling find_package(Freetype) on the system
+# set(Freetype_FOUND TRUE)
+# set(Freetype_INCLUDE_DIRS "${freetype_SOURCE_DIR}/include")
+# set(Freetype_LIBRARIES freetype)
+
 FetchContent_Declare(SDL3 
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git 
     GIT_TAG release-3.4.2)
@@ -44,9 +67,9 @@ FetchContent_Declare(SDL3_mixer
     GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git 
     GIT_TAG main) 
 
-FetchContent_Declare(SDL_ttf 
-    GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git 
-    GIT_TAG main)
+# FetchContent_Declare(SDL_ttf 
+#     GIT_REPOSITORY https://github.com/libsdl-org/SDL_ttf.git 
+#     GIT_TAG main)
 
 FetchContent_Declare(glm 
     GIT_REPOSITORY https://github.com/g-truc/glm.git 
@@ -56,9 +79,23 @@ FetchContent_Declare(physfs
     GIT_REPOSITORY https://github.com/icculus/physfs.git 
     GIT_TAG release-3.2.0)
 
-FetchContent_MakeAvailable(SDL3 SDL3_mixer SDL_ttf glm physfs)
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG        master # Or a specific commit hash for stability
+)
 
-FetchContent_MakeAvailable(SDL3 SDL3_mixer SDL_ttf glm physfs)
+FetchContent_GetProperties(stb)
+if(NOT stb_POPULATED)
+    FetchContent_Populate(stb)
+endif()
+
+# Since stb is header-only, we create an INTERFACE library 
+# so you can just "link" to it to get the include paths.
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
+
+FetchContent_MakeAvailable(SDL3 SDL3_mixer glm physfs)
 
 find_package(OpenGL REQUIRED)
 
@@ -89,7 +126,7 @@ endif()
 target_include_directories(${PROJECT_NAME} PRIVATE 
     ${sdl3_SOURCE_DIR}/include
     ${sdl3_mixer_SOURCE_DIR}/include
-    ${sdl_ttf_SOURCE_DIR}/include
+    # ${sdl_ttf_SOURCE_DIR}/include
     ${glm_SOURCE_DIR}
     ${physfs_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/freeze
@@ -99,11 +136,12 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 # --- 6. Linking ---
 target_link_libraries(${PROJECT_NAME} PRIVATE
     SDL3::SDL3-static
-#    SDL3_main-static
-    SDL3_mixer::SDL3_mixer
-    SDL3_ttf::SDL3_ttf
+    SDL3_mixer::SDL3_mixer-static
+    # SDL3_ttf::SDL3_ttf-static
+    # freetype
     physfs-static
 #    OpenGL::GL
+    stb
 )
 
 # --- 7. Resource Management & Binary Packing ---
