@@ -19,11 +19,19 @@
 constexpr uint32_t WindowWidth = 1920;
 constexpr uint32_t WindowHeight = 1080;
 
+std::string font_path = "./assets/fonts/Passero_One/Passero_One-Regular.ttf";
+
 // SDL Window and Surfaces!
 SDL_Window* g_window 		= nullptr;
 SDL_Renderer* g_renderer	= nullptr;
 SDL_Surface* g_window_surf 	= nullptr;
 SDL_Surface* g_bg_img_surf 	= nullptr;
+
+struct FontData
+{
+    uint8_t *data = NULL;
+    size_t  size  = 0;
+} g_freeze_font;
 
 bool initialise(void);
 
@@ -59,6 +67,18 @@ bool initialise(void)
         }
     }
 
+    // Load Font File
+    g_freeze_font.data = (uint8_t *)SDL_LoadFile(font_path.c_str(), &g_freeze_font.size);
+    if(NULL !=  g_freeze_font.data)
+    {
+        std::cout << "FONT [" << font_path << "] size:=" << g_freeze_font.size << std::endl;
+        std::cout << "     [" << font_path << "] data[0]:=" << g_freeze_font.data[0] << std::endl;;
+        std::cout << "Magic me get on so well" << std::endl;
+    }
+    else
+    {
+        std::cout << "Font loading failed" << std::endl;
+    }
     return result;
 }
 
