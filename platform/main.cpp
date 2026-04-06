@@ -151,6 +151,15 @@ int main()
                         
                     }
                 }
+                else
+                {
+                    const bool* state = SDL_GetKeyboardState(NULL);
+                    
+                    if (state[SDL_SCANCODE_ESCAPE] || state[SDL_SCANCODE_Q]) 
+                    {
+                        running = false;
+                    }
+                }
             }
             if(running)
             {
